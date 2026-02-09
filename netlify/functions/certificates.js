@@ -44,6 +44,8 @@ async function fetchCert(sql, code) {
       a.email as attendee_email,
       c.name as course_name,
       c.logo_url,
+      (SELECT MIN(date) FROM course_days WHERE course_id = c.id AND date IS NOT NULL) as course_start_date,
+      (SELECT MAX(date) FROM course_days WHERE course_id = c.id AND date IS NOT NULL) as course_end_date,
       json_agg(DISTINCT jsonb_build_object(
         'name', ct.name,
         'title', ct.title
@@ -72,15 +74,12 @@ async function generateCertificatePDF(cert) {
   const gold = rgb(0.831, 0.686, 0.216);
   const gray = rgb(0.45, 0.45, 0.45);
 
-  // Logo from ENV first, fallback to course logo
   const LOGO_URL = process.env.LOGO_URL || cert.logo_url;
   let logo;
 
   if (LOGO_URL) {
     try {
-      console.log('Using LOGO_URL:', LOGO_URL);
       const img = await fetch(LOGO_URL).then(r => r.arrayBuffer());
-
       if (LOGO_URL.toLowerCase().endsWith('.jpg') || LOGO_URL.toLowerCase().endsWith('.jpeg')) {
         logo = await pdfDoc.embedJpg(img);
       } else {
@@ -91,16 +90,13 @@ async function generateCertificatePDF(cert) {
     }
   }
 
-  // WATERMARK (proportional, larger, placed in lower middle white space)
+  // WATERMARK - increased size
   if (logo) {
-    const maxWatermarkWidth = 560;
+    const maxWatermarkWidth = 680; // increased from 560
     const scale = maxWatermarkWidth / logo.width;
-
     const wmWidth = logo.width * scale;
     const wmHeight = logo.height * scale;
-
-    // Push watermark below issue date and above instructor
-    const watermarkY = height / 2 - wmHeight / 2 - 120;
+    const watermarkY = height / 2 - wmHeight / 2 - 100;
 
     page.drawImage(logo, {
       x: width / 2 - wmWidth / 2,
@@ -180,15 +176,56 @@ async function generateCertificatePDF(cert) {
     color: primary
   });
 
+  // Course dates
+  let courseDatesText = '';
+  if (cert.course_start_date && cert.course_end_date) {
+    const startDate = new Date(cert.course_start_date).toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric'
+    });
+    const endDate = new Date(cert.course_end_date).toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric'
+    });
+    if (startDate === endDate) {
+      courseDatesText = startDate;
+    } else {
+      courseDatesText = `${startDate} – ${endDate}`;
+    }
+  } else if (cert.course_start_date) {
+    courseDatesText = new Date(cert.course_start_date).toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  }
+
+  let yOffset = 355;
+
+  if (courseDatesText) {
+    page.drawText(courseDatesText, {
+      x: width / 2 - reg.widthOfTextAtSize(courseDatesText, 14) / 2,
+      y: height - yOffset,
+      size: 14,
+      font: reg,
+      color: gray
+    });
+    yOffset += 25;
+  }
+
   const days = `Attended ${cert.days_attended} of ${cert.total_days} days`;
 
   page.drawText(days, {
     x: width / 2 - reg.widthOfTextAtSize(days, 14) / 2,
-    y: height - 355,
+    y: height - yOffset,
     size: 14,
     font: reg,
     color: gray
   });
+
+  yOffset += 25;
 
   const issued = new Date(cert.issued_at).toLocaleDateString('en-US', {
     month: 'long',
@@ -199,7 +236,7 @@ async function generateCertificatePDF(cert) {
 
   page.drawText(dateText, {
     x: width / 2 - reg.widthOfTextAtSize(dateText, 12) / 2,
-    y: height - 380,
+    y: height - yOffset,
     size: 12,
     font: reg,
     color: gray
@@ -210,15 +247,16 @@ async function generateCertificatePDF(cert) {
   // Instructor centered
   if (cert.trainers?.length) {
     const t = cert.trainers.map(x => x.name).filter(Boolean).join(', ');
-    const instructorText = `Instructor: ${t}`;
-
-    page.drawText(instructorText, {
-      x: width / 2 - bold.widthOfTextAtSize(instructorText, 12) / 2,
-      y: footerBaseY + 30,
-      size: 12,
-      font: bold,
-      color: primary
-    });
+    if (t) {
+      const instructorText = `Instructor: ${t}`;
+      page.drawText(instructorText, {
+        x: width / 2 - bold.widthOfTextAtSize(instructorText, 12) / 2,
+        y: footerBaseY + 30,
+        size: 12,
+        font: bold,
+        color: primary
+      });
+    }
   }
 
   // Company centered
