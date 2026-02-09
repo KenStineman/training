@@ -7,15 +7,11 @@ export function HomePage() {
   const [certCode, setCertCode] = useState('');
   const navigate = useNavigate();
 
-  const logoUrl =
-    (typeof process !== 'undefined' &&
-      process.env &&
-      process.env.LOGO_URL) ||
-    '';
+  // Vite-compatible environment variable
+  const logoUrl = import.meta.env.VITE_LOGO_URL || '';
 
   const handleVerify = (e) => {
     e.preventDefault();
-    // Only allow alphanumeric, strip everything else
     const sanitized = certCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (sanitized) {
       navigate(`/cert/${sanitized}`);
@@ -63,14 +59,7 @@ export function HomePage() {
                 </h2>
 
                 <p className="text-gray-600 mb-4">
-                  Scan the QR code provided by your instructor to record your attendance.
-                </p>
-
-                <p className="text-sm text-gray-500">
-                  Your attendance URL will look like:{' '}
-                  <code className="bg-gray-100 px-2 py-1 rounded">
-                    /attend/course-name/1
-                  </code>
+                  Scan the QR code or use the URL link provided by your instructor to record your attendance.
                 </p>
               </div>
             </CardBody>
@@ -113,10 +102,7 @@ export function HomePage() {
 
         {/* Admin Link */}
         <div className="text-center mt-12">
-          <Link
-            to="/admin"
-            className="text-sm text-gray-500 hover:text-gray-700"
-          >
+          <Link to="/admin" className="text-sm text-gray-500 hover:text-gray-700">
             Administrator Login →
           </Link>
         </div>
