@@ -95,7 +95,6 @@ export function CertificatesPage() {
   const unsentCertificates = certificates.filter(c => !c.emailed_at);
   const sentCertificates = certificates.filter(c => c.emailed_at);
 
-  // Build eligibility description based on course settings
   const getEligibilityText = () => {
     if (!course) return '';
     
@@ -111,7 +110,6 @@ export function CertificatesPage() {
   return (
     <AdminLayout>
       <div className="space-y-6">
-        {/* Header */}
         <div>
           <Link
             to={`/admin/courses/${id}`}
@@ -137,7 +135,6 @@ export function CertificatesPage() {
           </Alert>
         )}
 
-        {/* Generate Section */}
         <Card>
           <CardBody>
             <h2 className="text-lg font-semibold mb-4">Generate Certificates</h2>
@@ -148,7 +145,6 @@ export function CertificatesPage() {
           </CardBody>
         </Card>
 
-        {/* Unsent Certificates */}
         {unsentCertificates.length > 0 && (
           <Card>
             <CardBody>
@@ -211,7 +207,6 @@ export function CertificatesPage() {
           </Card>
         )}
 
-        {/* Sent Certificates */}
         {sentCertificates.length > 0 && (
           <Card>
             <CardBody>
@@ -252,7 +247,6 @@ export function CertificatesPage() {
           </Card>
         )}
 
-        {/* Empty State */}
         {certificates.length === 0 && (
           <Card>
             <CardBody className="text-center py-8">
