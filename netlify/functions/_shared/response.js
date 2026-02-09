@@ -38,7 +38,7 @@ export function pdf(buffer, filename) {
     statusCode: 200,
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Disposition': `inline; filename="${filename}"`,
       ...CORS_HEADERS,
     },
     body: buffer.toString('base64'),
