@@ -93,13 +93,13 @@ async function sendCertificateEmail(cert) {
     return true;
   }
 
-  const baseUrl = process.env.URL || 'https://apps.double-helix.com';
-  const certUrl = `${baseUrl}/training/cert/${cert.verification_code}`;
+  const baseUrl = process.env.URL || 'https://training.double-helix.com';
+  const certUrl = `${baseUrl}/cert/${cert.verification_code}`;
   
   const isCompletion = cert.certificate_type === 'completion';
   const certTitle = isCompletion ? 'Completion' : 'Participation';
 
-  const emailFrom = process.env.EMAIL_FROM || 'training@double-helix.com';
+  const emailFrom = process.env.EMAIL_FROM || 'training@mail.double-helix.com';
 
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
