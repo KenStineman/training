@@ -8,10 +8,10 @@ export function AttendanceTable({
   course,
 }) {
   const getAttendanceStatus = (attendee) => {
-    const attended = attendee.days_attended || 0;
+    const attended = attendee.attendance?.length || 0;
     const total = course.num_days;
     const pct = percentage(attended, total);
-    
+
     if (attended === total) {
       return { label: 'Complete', variant: 'success' };
     } else if (pct >= 50) {
@@ -19,6 +19,7 @@ export function AttendanceTable({
     } else if (attended > 0) {
       return { label: `${attended}/${total} days`, variant: 'danger' };
     }
+
     return { label: 'No attendance', variant: 'default' };
   };
 
@@ -43,6 +44,7 @@ export function AttendanceTable({
             </th>
           </tr>
         </thead>
+
         <tbody className="bg-white divide-y divide-gray-200">
           {attendees.length === 0 ? (
             <tr>
@@ -56,6 +58,7 @@ export function AttendanceTable({
           ) : (
             attendees.map((attendee) => {
               const status = getAttendanceStatus(attendee);
+
               return (
                 <tr key={attendee.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
@@ -73,10 +76,12 @@ export function AttendanceTable({
                       )}
                     </div>
                   </td>
+
                   {days.map((day) => {
                     const attendance = attendee.attendance?.find(
                       (a) => a.day_number === day.day_number
                     );
+
                     return (
                       <td
                         key={day.day_number}
@@ -91,14 +96,17 @@ export function AttendanceTable({
                             ✓
                           </span>
                         ) : (
-                          <span className="inline-flex items-center justify-center w-6 h-6 
-                                          rounded-full bg-gray-100 text-gray-400">
+                          <span
+                            className="inline-flex items-center justify-center w-6 h-6 
+                                       rounded-full bg-gray-100 text-gray-400"
+                          >
                             –
                           </span>
                         )}
                       </td>
                     );
                   })}
+
                   <td className="px-4 py-3 text-center">
                     <Badge variant={status.variant}>{status.label}</Badge>
                   </td>
