@@ -91,7 +91,7 @@ async function generateCertificatePDF(cert) {
     }
   }
 
-  // WATERMARK (proportional, larger, shifted downward)
+  // WATERMARK (proportional, larger, placed in lower middle white space)
   if (logo) {
     const maxWatermarkWidth = 560;
     const scale = maxWatermarkWidth / logo.width;
@@ -99,9 +99,12 @@ async function generateCertificatePDF(cert) {
     const wmWidth = logo.width * scale;
     const wmHeight = logo.height * scale;
 
+    // Push watermark below issue date and above instructor
+    const watermarkY = height / 2 - wmHeight / 2 - 120;
+
     page.drawImage(logo, {
       x: width / 2 - wmWidth / 2,
-      y: height / 2 - wmHeight / 2 - 40,
+      y: watermarkY,
       width: wmWidth,
       height: wmHeight,
       opacity: 0.06
@@ -187,7 +190,11 @@ async function generateCertificatePDF(cert) {
     color: gray
   });
 
-  const issued = new Date(cert.issued_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const issued = new Date(cert.issued_at).toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  });
   const dateText = `Issued: ${issued}`;
 
   page.drawText(dateText, {
