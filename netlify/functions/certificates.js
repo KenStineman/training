@@ -91,9 +91,9 @@ async function generateCertificatePDF(cert) {
     }
   }
 
-  // WATERMARK (proportional scaling)
+  // WATERMARK (proportional, larger, shifted downward)
   if (logo) {
-    const maxWatermarkWidth = 500;
+    const maxWatermarkWidth = 560;
     const scale = maxWatermarkWidth / logo.width;
 
     const wmWidth = logo.width * scale;
@@ -101,7 +101,7 @@ async function generateCertificatePDF(cert) {
 
     page.drawImage(logo, {
       x: width / 2 - wmWidth / 2,
-      y: height / 2 - wmHeight / 2,
+      y: height / 2 - wmHeight / 2 - 40,
       width: wmWidth,
       height: wmHeight,
       opacity: 0.06
