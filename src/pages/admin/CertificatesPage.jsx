@@ -76,14 +76,6 @@ export function CertificatesPage() {
     setSelected(newSelected);
   };
 
-  const toggleSelectAll = () => {
-    if (selected.size === unsentCertificates.length) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(unsentCertificates.map(c => c.id)));
-    }
-  };
-
   if (loading) {
     return (
       <AdminLayout>
@@ -94,6 +86,14 @@ export function CertificatesPage() {
 
   const unsentCertificates = certificates.filter(c => !c.emailed_at);
   const sentCertificates = certificates.filter(c => c.emailed_at);
+
+  const toggleSelectAll = () => {
+    if (selected.size === unsentCertificates.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(unsentCertificates.map(c => c.id)));
+    }
+  };
 
   const getEligibilityText = () => {
     if (!course) return '';
@@ -191,7 +191,8 @@ export function CertificatesPage() {
                       <span className="text-sm text-gray-500">
                         {cert.days_attended}/{cert.total_days} days
                       </span>
-                      
+
+                      <a
                         href={`/cert/${cert.verification_code}`}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -231,7 +232,8 @@ export function CertificatesPage() {
                       <span className="text-sm text-gray-500">
                         Sent {new Date(cert.emailed_at).toLocaleDateString()}
                       </span>
-                      
+
+                      <a
                         href={`/cert/${cert.verification_code}`}
                         target="_blank"
                         rel="noopener noreferrer"
