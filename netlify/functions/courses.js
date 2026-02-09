@@ -8,7 +8,11 @@ export async function handler(event, context) {
   }
 
   const sql = getDb();
-  const path = event.path.replace(/^\/\.netlify\/functions\/courses\/?/, '');
+  
+  // Parse path - handle both formats
+  const path = event.path
+    .replace(/^\/?\.netlify\/functions\/courses\/?/, '')
+    .replace(/^\/?api\/courses\/?/, '');
   const segments = path.split('/').filter(Boolean);
 
   try {

@@ -2,7 +2,7 @@ import { getDb } from './_shared/db.js';
 import { verifyAuth } from './_shared/auth.js';
 import { json, notFound, error, options } from './_shared/response.js';
 
-async function handler(event, context) {
+export async function handler(event, context) {
   // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
     return options();
@@ -19,13 +19,25 @@ async function handler(event, context) {
   }
 
   const sql = getDb();
-  const path = event.path.replace(/^\/\.netlify\/functions\/admin-course-details\/?/, '');
+  
+  // Parse path - handle both formats
+  const path = event.path
+    .replace(/^\/?\.netlify\/functions\/admin-course-details\/?/, '')
+    .replace(/^\/?api\/admin\/courses\/?/, '');
   const segments = path.split('/').filter(Boolean);
+  
+  // Expected: [courseId, action] e.g., ['abc123', 'trainers']
 
   try {
-    // PUT /admin/courses/:id/trainers - Update trainers
-    if (event.httpMethod === 'PUT' && segments.length === 2 && segments[1] === 'trainers') {
-      const courseId = segments[0];
+    if (segments.length < 2) {
+      return notFound('Endpoint not found');
+    }
+
+    const courseId = segments[0];
+    const action = segments[1];
+
+    // PUT /:id/trainers - Update trainers
+    if (event.httpMethod === 'PUT' && action === 'trainers') {
       const { trainers } = JSON.parse(event.body);
 
       // Delete existing trainers
@@ -48,9 +60,8 @@ async function handler(event, context) {
       return json({ trainers: updated });
     }
 
-    // PUT /admin/courses/:id/days - Update days
-    if (event.httpMethod === 'PUT' && segments.length === 2 && segments[1] === 'days') {
-      const courseId = segments[0];
+    // PUT /:id/days - Update days
+    if (event.httpMethod === 'PUT' && action === 'days') {
       const { days } = JSON.parse(event.body);
 
       for (const day of days) {
@@ -152,10 +163,8 @@ async function handler(event, context) {
       return json({ days: updated });
     }
 
-    // GET /admin/courses/:id/attendance - Get attendance report
-    if (event.httpMethod === 'GET' && segments.length === 2 && segments[1] === 'attendance') {
-      const courseId = segments[0];
-
+    // GET /:id/attendance - Get attendance report
+    if (event.httpMethod === 'GET' && action === 'attendance') {
       const attendees = await sql`
         SELECT 
           a.id,
@@ -183,10 +192,8 @@ async function handler(event, context) {
       return json({ attendees });
     }
 
-    // POST /admin/courses/:id/certificates - Generate certificates
-    if (event.httpMethod === 'POST' && segments.length === 2 && segments[1] === 'certificates') {
-      const courseId = segments[0];
-
+    // POST /:id/certificates - Generate certificates
+    if (event.httpMethod === 'POST' && action === 'certificates') {
       // Get course details
       const courses = await sql`SELECT * FROM courses WHERE id = ${courseId}`;
       if (courses.length === 0) {
@@ -231,10 +238,8 @@ async function handler(event, context) {
       return json({ success: true, count: generated });
     }
 
-    // GET /admin/courses/:id/certificates - List certificates
-    if (event.httpMethod === 'GET' && segments.length === 2 && segments[1] === 'certificates') {
-      const courseId = segments[0];
-
+    // GET /:id/certificates - List certificates
+    if (event.httpMethod === 'GET' && action === 'certificates') {
       const certificates = await sql`
         SELECT 
           cert.*,
@@ -265,5 +270,3 @@ function generateVerificationCode() {
   }
   return code;
 }
-
-export { handler };

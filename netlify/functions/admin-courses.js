@@ -1,15 +1,32 @@
 import { getDb } from './_shared/db.js';
+import { verifyAuth } from './_shared/auth.js';
 import { json, notFound, error, options } from './_shared/response.js';
 
-async function handler(event, context) {
+export async function handler(event, context) {
   // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
     return options();
   }
 
+  // Verify auth
+  const auth = await verifyAuth(event);
+  if (!auth.authenticated) {
+    return {
+      statusCode: 401,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: auth.error || 'Unauthorized' }),
+    };
+  }
+
   const sql = getDb();
-  const path = event.path.replace(/^\/\.netlify\/functions\/admin-courses\/?/, '');
+  
+  // Parse the path - handle both /api/admin/courses/... and /.netlify/functions/admin-courses/...
+  const path = event.path
+    .replace(/^\/?\.netlify\/functions\/admin-courses\/?/, '')
+    .replace(/^\/?api\/admin\/courses\/?/, '');
   const segments = path.split('/').filter(Boolean);
+  
+  // segments will be [] for list/create, or [id] for get/update/delete
 
   try {
     // GET /admin/courses - List all courses
@@ -206,28 +223,3 @@ async function handler(event, context) {
     return error('Server error: ' + err.message, 500);
   }
 }
-
-// Wrap handler with auth check
-const protectedHandler = async (event, context) => {
-  // Allow OPTIONS without auth
-  if (event.httpMethod === 'OPTIONS') {
-    return options();
-  }
-  
-  // Verify auth for all other methods
-  const { verifyAuth } = await import('./_shared/auth.js');
-  const auth = await verifyAuth(event);
-  
-  if (!auth.authenticated) {
-    return {
-      statusCode: 401,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: auth.error || 'Unauthorized' }),
-    };
-  }
-  
-  event.user = auth.user;
-  return handler(event, context);
-};
-
-export { protectedHandler as handler };
