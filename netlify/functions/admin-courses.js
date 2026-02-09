@@ -2,7 +2,7 @@ import { getDb } from './_shared/db.js';
 import { verifyAuth } from './_shared/auth.js';
 import { json, notFound, error, options } from './_shared/response.js';
 
-export async function handler(event, context) {
+async function handler(event, context) {
   // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
     return options();
@@ -25,8 +25,6 @@ export async function handler(event, context) {
     .replace(/^\/?\.netlify\/functions\/admin-courses\/?/, '')
     .replace(/^\/?api\/admin\/courses\/?/, '');
   const segments = path.split('/').filter(Boolean);
-  
-  // segments will be [] for list/create, or [id] for get/update/delete
 
   try {
     // GET /admin/courses - List all courses
@@ -56,6 +54,7 @@ export async function handler(event, context) {
         requires_all_days_for_completion,
         certificate_template,
         logo_url,
+        default_organization,
         active,
       } = body;
 
@@ -73,12 +72,12 @@ export async function handler(event, context) {
         INSERT INTO courses (
           name, slug, description, num_days, certificate_type,
           min_days_for_participation, requires_all_days_for_completion,
-          certificate_template, logo_url, active
+          certificate_template, logo_url, default_organization, active
         ) VALUES (
           ${name}, ${slug}, ${description || null}, ${num_days || 1},
           ${certificate_type || 'completion'}, ${min_days_for_participation || 1},
           ${requires_all_days_for_completion ?? true}, ${certificate_template || 'standard'},
-          ${logo_url || null}, ${active ?? true}
+          ${logo_url || null}, ${default_organization || null}, ${active ?? true}
         )
         RETURNING *
       `;
@@ -153,6 +152,7 @@ export async function handler(event, context) {
         requires_all_days_for_completion,
         certificate_template,
         logo_url,
+        default_organization,
         active,
       } = body;
 
@@ -183,6 +183,7 @@ export async function handler(event, context) {
           requires_all_days_for_completion = COALESCE(${requires_all_days_for_completion}, requires_all_days_for_completion),
           certificate_template = COALESCE(${certificate_template}, certificate_template),
           logo_url = ${logo_url},
+          default_organization = ${default_organization},
           active = COALESCE(${active}, active),
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ${courseId}
@@ -223,3 +224,5 @@ export async function handler(event, context) {
     return error('Server error: ' + err.message, 500);
   }
 }
+
+export { handler };

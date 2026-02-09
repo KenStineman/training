@@ -1,149 +1,114 @@
 import React, { useState } from 'react';
-import { Button, Input, Alert } from '../ui';
-import SurveyQuestion from './SurveyQuestion';
+import { Input, Button, Alert } from '../ui';
+import { SurveyQuestion } from './SurveyQuestion';
 import { isValidEmail } from '../../utils/helpers';
-import { MESSAGES } from '../../config/constants';
 
-export function AttendanceForm({
-  course,
-  day,
-  questions = [],
-  onSubmit,
-  loading = false,
-  error = null,
-}) {
+export function AttendanceForm({ course, day, questions, onSubmit, loading, error }) {
   const [formData, setFormData] = useState({
     email: '',
     fullName: '',
-    organization: '',
+    organization: course?.default_organization || '',
   });
   const [responses, setResponses] = useState({});
-  const [errors, setErrors] = useState({});
+  const [validationError, setValidationError] = useState(null);
 
-  const validateForm = () => {
-    const newErrors = {};
-    
-    if (!formData.email) {
-      newErrors.email = MESSAGES.REQUIRED_FIELD;
-    } else if (!isValidEmail(formData.email)) {
-      newErrors.email = MESSAGES.INVALID_EMAIL;
-    }
-    
-    if (!formData.fullName || formData.fullName.trim().length < 2) {
-      newErrors.fullName = 'Please enter your full name';
-    }
-    
-    // Validate required questions
-    questions.forEach((q) => {
-      if (q.required && !responses[q.id]) {
-        newErrors[`question_${q.id}`] = MESSAGES.REQUIRED_FIELD;
-      }
-    });
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const organizationLocked = !!course?.default_organization;
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    setValidationError(null);
+  };
+
+  const handleResponseChange = (questionId, value) => {
+    setResponses(prev => ({ ...prev, [questionId]: value }));
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
-    if (!validateForm()) return;
-    
+    setValidationError(null);
+
+    // Validate
+    if (!formData.email || !formData.fullName) {
+      setValidationError('Please fill in all required fields.');
+      return;
+    }
+
+    if (!isValidEmail(formData.email)) {
+      setValidationError('Please enter a valid email address.');
+      return;
+    }
+
+    // Check required questions
+    const requiredQuestions = questions?.filter(q => q.required) || [];
+    for (const q of requiredQuestions) {
+      if (!responses[q.id]) {
+        setValidationError(`Please answer: "${q.question_text}"`);
+        return;
+      }
+    }
+
     onSubmit({
       ...formData,
-      email: formData.email.toLowerCase().trim(),
-      fullName: formData.fullName.trim(),
-      organization: formData.organization.trim(),
       responses,
     });
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: null }));
-    }
-  };
-
-  const handleResponseChange = (questionId, value) => {
-    setResponses((prev) => ({ ...prev, [questionId]: value }));
-    if (errors[`question_${questionId}`]) {
-      setErrors((prev) => ({ ...prev, [`question_${questionId}`]: null }));
-    }
-  };
-
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {error && (
-        <Alert variant="error">{error}</Alert>
+      {(error || validationError) && (
+        <Alert variant="error">
+          {error || validationError}
+        </Alert>
       )}
 
-      {/* Attendee Info */}
       <div className="space-y-4">
         <Input
           label="Email Address"
-          type="email"
           name="email"
+          type="email"
           value={formData.email}
-          onChange={handleInputChange}
-          error={errors.email}
-          placeholder="you@example.com"
+          onChange={handleChange}
           required
-          autoComplete="email"
-          autoFocus
+          placeholder="you@example.com"
         />
 
         <Input
           label="Full Name"
-          type="text"
           name="fullName"
           value={formData.fullName}
-          onChange={handleInputChange}
-          error={errors.fullName}
-          placeholder="John Smith"
+          onChange={handleChange}
           required
-          autoComplete="name"
+          placeholder="Your full name"
         />
 
         <Input
-          label="Organization (Optional)"
-          type="text"
+          label="Organization"
           name="organization"
           value={formData.organization}
-          onChange={handleInputChange}
-          placeholder="Company or organization"
-          autoComplete="organization"
+          onChange={handleChange}
+          placeholder="Your company or organization"
+          disabled={organizationLocked}
+          helpText={organizationLocked ? "Set by course administrator" : "Optional"}
         />
       </div>
 
-      {/* Survey Questions */}
-      {questions.length > 0 && (
-        <div className="space-y-6 pt-4 border-t border-gray-200">
-          <h3 className="font-medium text-gray-900">
-            Quick Survey
-          </h3>
-          
-          {questions.map((question) => (
+      {questions && questions.length > 0 && (
+        <div className="space-y-6 pt-6 border-t">
+          <h3 className="font-medium text-gray-900">Survey Questions</h3>
+          {questions.map(question => (
             <SurveyQuestion
               key={question.id}
               question={question}
               value={responses[question.id] || ''}
               onChange={(value) => handleResponseChange(question.id, value)}
-              error={errors[`question_${question.id}`]}
             />
           ))}
         </div>
       )}
 
-      {/* Submit */}
-      <Button
-        type="submit"
-        className="w-full"
-        size="lg"
-        loading={loading}
-      >
-        Record Attendance
+      <Button type="submit" className="w-full" loading={loading}>
+        Check In for Day {day?.day_number}
       </Button>
     </form>
   );
