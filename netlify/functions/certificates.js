@@ -75,7 +75,6 @@ async function generateCertificatePDF(cert) {
   const gold = rgb(0.831, 0.686, 0.216);
   const gray = rgb(0.45, 0.45, 0.45);
 
-  // Load logo once
   let logo;
   if (cert.logo_url) {
     const img = await fetch(cert.logo_url).then(r => r.arrayBuffer());
@@ -188,19 +187,6 @@ async function generateCertificatePDF(cert) {
     const t = cert.trainers.map(x=>x.name).filter(Boolean).join(', ');
     page.drawText(`Instructor: ${t}`,{ x:80,y:90,size:12,font:bold,color:primary });
   }
-
-  // GOLD SEAL
-  const sealX = width - 150;
-  const sealY = 150;
-
-  page.drawCircle({ x:sealX,y:sealY,size:40,borderColor:gold,borderWidth:3 });
-  page.drawText('VERIFIED',{
-    x: sealX - 25,
-    y: sealY - 4,
-    size:10,
-    font:bold,
-    color:gold
-  });
 
   // Footer
   const verify = `Verification Code: ${cert.verification_code}`;
