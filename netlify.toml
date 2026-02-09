@@ -6,82 +6,15 @@
 [functions]
   node_bundler = "esbuild"
 
-# API redirects - specific routes first
-
-# Public API routes
 [[redirects]]
-  from = "/training/api/courses/:slug/day/:day"
-  to = "/.netlify/functions/courses/:slug/day/:day"
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
   status = 200
 
 [[redirects]]
-  from = "/training/api/courses/:slug"
-  to = "/.netlify/functions/courses/:slug"
+  from = "/*"
+  to = "/index.html"
   status = 200
-
-[[redirects]]
-  from = "/training/api/attendance"
-  to = "/.netlify/functions/attendance"
-  status = 200
-
-[[redirects]]
-  from = "/training/api/certificates/:code/pdf"
-  to = "/.netlify/functions/certificates/:code/pdf"
-  status = 200
-
-[[redirects]]
-  from = "/training/api/certificates/:code"
-  to = "/.netlify/functions/certificates/:code"
-  status = 200
-
-# Admin API routes
-[[redirects]]
-  from = "/training/api/admin/certificates/send"
-  to = "/.netlify/functions/admin-send-certificates"
-  status = 200
-
-[[redirects]]
-  from = "/training/api/admin/courses/:id/trainers"
-  to = "/.netlify/functions/admin-course-details/:id/trainers"
-  status = 200
-
-[[redirects]]
-  from = "/training/api/admin/courses/:id/days"
-  to = "/.netlify/functions/admin-course-details/:id/days"
-  status = 200
-
-[[redirects]]
-  from = "/training/api/admin/courses/:id/attendance"
-  to = "/.netlify/functions/admin-course-details/:id/attendance"
-  status = 200
-
-[[redirects]]
-  from = "/training/api/admin/courses/:id/certificates"
-  to = "/.netlify/functions/admin-course-details/:id/certificates"
-  status = 200
-
-[[redirects]]
-  from = "/training/api/admin/courses/:id"
-  to = "/.netlify/functions/admin-courses/:id"
-  status = 200
-
-[[redirects]]
-  from = "/training/api/admin/courses"
-  to = "/.netlify/functions/admin-courses"
-  status = 200
-
-# SPA fallback - serve index.html for all /training/* routes
-[[redirects]]
-  from = "/training/*"
-  to = "/training/index.html"
-  status = 200
-
-# Environment variables (set in Netlify dashboard)
-[context.production.environment]
-  VITE_APP_BASE_URL = "/training"
-
-[context.deploy-preview.environment]
-  VITE_APP_BASE_URL = "/training"
 
 [dev]
   command = "npm run dev"

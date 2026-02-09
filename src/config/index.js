@@ -4,7 +4,7 @@
 export const config = {
   // App
   appName: import.meta.env.VITE_APP_NAME || 'Double Helix Training',
-  appBaseUrl: import.meta.env.VITE_APP_BASE_URL || '/training',
+  appBaseUrl: import.meta.env.VITE_APP_BASE_URL || '',
   
   // Company
   companyName: import.meta.env.VITE_COMPANY_NAME || 'Double Helix LLC',
@@ -12,10 +12,10 @@ export const config = {
   supportEmail: import.meta.env.VITE_SUPPORT_EMAIL || 'support@double-helix.com',
   
   // Default logo (can be overridden per course)
-  defaultLogoUrl: import.meta.env.VITE_DEFAULT_LOGO_URL || '/training/images/logo.png',
+  defaultLogoUrl: import.meta.env.VITE_DEFAULT_LOGO_URL || '/images/logo.png',
   
   // API
-  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || '/training/api',
+  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || '/api',
   
   // Feature flags
   features: {

@@ -3,17 +3,16 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  base: '/training/',
+  base: '/',
   build: {
     outDir: 'dist',
-    sourcemap: true,
   },
   server: {
     proxy: {
-      '/training/api': {
-        target: 'http://localhost:8888/.netlify/functions',
+      '/api': {
+        target: 'http://localhost:8888',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/training\/api/, ''),
+        rewrite: (path) => path.replace(/^\/api/, '/.netlify/functions'),
       },
     },
   },
