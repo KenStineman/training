@@ -4,10 +4,11 @@ let sql;
 
 export function getDb() {
   if (!sql) {
-    if (!process.env.DATABASE_URL) {
+    const dbUrl = process.env.DATABASE_URL || process.env.NETLIFY_DATABASE_URL;
+    if (!dbUrl) {
       throw new Error('DATABASE_URL environment variable is not set');
     }
-    sql = neon(process.env.DATABASE_URL);
+    sql = neon(dbUrl);
   }
   return sql;
 }
