@@ -5,7 +5,7 @@ import config from '../../config';
 
 export function CertificateView({
   certificate,
-  onDownload,
+  onView,
   loading = false,
 }) {
   if (!certificate) {
@@ -87,12 +87,12 @@ export function CertificateView({
 
       {/* Actions */}
       <div className="mt-6 text-center">
-        <Button onClick={onDownload} loading={loading} size="lg">
-          Download PDF Certificate
+        <Button onClick={onView} loading={loading} size="lg">
+          View PDF Certificate
         </Button>
         <p className="mt-4 text-sm text-gray-500">
           This certificate was issued by{' '}
-          <a
+          
             href={config.companyUrl}
             target="_blank"
             rel="noopener noreferrer"
