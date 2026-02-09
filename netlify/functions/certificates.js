@@ -15,16 +15,13 @@ export async function handler(event, context) {
   try {
     if (event.httpMethod === 'GET' && segments.length === 1) {
       const code = segments[0].toUpperCase();
-
       const rows = await fetchCert(sql, code);
       if (!rows.length) return notFound('Certificate not found');
-
       return json(rows[0]);
     }
 
     if (event.httpMethod === 'GET' && segments[1] === 'pdf') {
       const code = segments[0].toUpperCase();
-
       const rows = await fetchCert(sql, code);
       if (!rows.length) return notFound('Certificate not found');
 
@@ -75,7 +72,7 @@ async function generateCertificatePDF(cert) {
   const gold = rgb(0.831, 0.686, 0.216);
   const gray = rgb(0.45, 0.45, 0.45);
 
-  // Load logo from ENV first, fallback to course logo
+  // Logo from ENV first, fallback to course logo
   const LOGO_URL = process.env.LOGO_URL || cert.logo_url;
   let logo;
 
@@ -94,13 +91,19 @@ async function generateCertificatePDF(cert) {
     }
   }
 
-  // WATERMARK
+  // WATERMARK (proportional scaling)
   if (logo) {
+    const maxWatermarkWidth = 500;
+    const scale = maxWatermarkWidth / logo.width;
+
+    const wmWidth = logo.width * scale;
+    const wmHeight = logo.height * scale;
+
     page.drawImage(logo, {
-      x: width / 2 - 220,
-      y: height / 2 - 220,
-      width: 440,
-      height: 440,
+      x: width / 2 - wmWidth / 2,
+      y: height / 2 - wmHeight / 2,
+      width: wmWidth,
+      height: wmHeight,
       opacity: 0.06
     });
   }
