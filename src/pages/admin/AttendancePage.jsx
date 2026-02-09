@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { AdminLayout } from '../../components/layout';
 import { AttendanceTable } from '../../components/admin';
-import { Card, CardBody, Loading, Alert, Badge } from '../../components/ui';
+import { Card, CardBody, Loading, Alert } from '../../components/ui';
 import { getAdminCourse, getAttendanceReport } from '../../utils/api';
-import { pluralize, percentage } from '../../utils/helpers';
+import { percentage } from '../../utils/helpers';
 
 export function AttendancePage() {
   const { id } = useParams();
-  
+
   const [course, setCourse] = useState(null);
   const [days, setDays] = useState([]);
   const [attendees, setAttendees] = useState([]);
@@ -51,12 +51,16 @@ export function AttendancePage() {
     );
   }
 
-  // Calculate stats
+  // ✅ FIXED: derive attendance from attendance array
   const completedCount = attendees.filter(
-    a => a.days_attended === course.num_days
+    a => (a.attendance?.length || 0) === course.num_days
   ).length;
+
   const partialCount = attendees.filter(
-    a => a.days_attended > 0 && a.days_attended < course.num_days
+    a => {
+      const attended = a.attendance?.length || 0;
+      return attended > 0 && attended < course.num_days;
+    }
   ).length;
 
   return (
@@ -70,9 +74,11 @@ export function AttendancePage() {
           >
             ← Back to {course.name}
           </Link>
+
           <h1 className="text-2xl font-display font-bold text-gray-900">
             Attendance Report
           </h1>
+
           <p className="text-gray-500">{course.name}</p>
         </div>
 
@@ -84,22 +90,28 @@ export function AttendancePage() {
               <div className="text-sm text-gray-500">Total Attendees</div>
             </CardBody>
           </Card>
+
           <Card>
             <CardBody className="text-center">
               <div className="text-2xl font-bold text-green-600">{completedCount}</div>
               <div className="text-sm text-gray-500">Completed All Days</div>
             </CardBody>
           </Card>
+
           <Card>
             <CardBody className="text-center">
               <div className="text-2xl font-bold text-yellow-600">{partialCount}</div>
               <div className="text-sm text-gray-500">Partial Attendance</div>
             </CardBody>
           </Card>
+
           <Card>
             <CardBody className="text-center">
               <div className="text-2xl font-bold text-helix-primary">
-                {attendees.length > 0 ? percentage(completedCount, attendees.length) : 0}%
+                {attendees.length > 0
+                  ? percentage(completedCount, attendees.length)
+                  : 0}
+                %
               </div>
               <div className="text-sm text-gray-500">Completion Rate</div>
             </CardBody>
