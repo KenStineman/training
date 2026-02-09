@@ -41,10 +41,11 @@ export function CertificateView({
           <h2 className="text-3xl font-display font-bold text-gray-900 mb-4">
             {certificate.attendee_name}
           </h2>
-          
+
           <p className="text-gray-600 mb-2">
             has successfully {isCompletion ? 'completed' : 'participated in'}
           </p>
+
           <h3 className="text-xl font-semibold text-helix-primary mb-4">
             {certificate.course_name}
           </h3>
@@ -90,9 +91,10 @@ export function CertificateView({
         <Button onClick={onView} loading={loading} size="lg">
           View PDF Certificate
         </Button>
+
         <p className="mt-4 text-sm text-gray-500">
           This certificate was issued by{' '}
-          
+          <a
             href={config.companyUrl}
             target="_blank"
             rel="noopener noreferrer"
