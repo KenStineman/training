@@ -25,8 +25,6 @@ export async function handler(event, context) {
     .replace(/^\/?\.netlify\/functions\/admin-course-details\/?/, '')
     .replace(/^\/?api\/admin\/courses\/?/, '');
   const segments = path.split('/').filter(Boolean);
-  
-  // Expected: [courseId, action] e.g., ['abc123', 'trainers']
 
   try {
     if (segments.length < 2) {
@@ -201,13 +199,13 @@ export async function handler(event, context) {
       }
       const course = courses[0];
 
-      // Get eligible attendees (completed all days, no certificate yet)
-      const eligible = await sql`
+      // Get all attendees with their attendance count who don't have certificates yet
+      const attendees = await sql`
         SELECT 
           e.id as enrollment_id,
           a.full_name,
           a.email,
-          COUNT(att.id) as days_attended
+          COUNT(att.id)::int as days_attended
         FROM enrollments e
         JOIN attendees a ON e.attendee_id = a.id
         LEFT JOIN attendance att ON e.id = att.enrollment_id
@@ -215,24 +213,47 @@ export async function handler(event, context) {
         WHERE e.course_id = ${courseId}
           AND cert.id IS NULL
         GROUP BY e.id, a.id
-        HAVING COUNT(att.id) >= ${course.requires_all_days_for_completion ? course.num_days : course.min_days_for_participation}
       `;
 
       let generated = 0;
-      for (const attendee of eligible) {
-        const certType = attendee.days_attended >= course.num_days ? 'completion' : 'participation';
-        const verificationCode = generateVerificationCode();
+      
+      for (const attendee of attendees) {
+        let certType = null;
+        
+        // Determine certificate type based on course settings and attendance
+        if (course.certificate_type === 'completion') {
+          // Only completion certificates - must attend all days
+          if (attendee.days_attended >= course.num_days) {
+            certType = 'completion';
+          }
+        } else if (course.certificate_type === 'participation') {
+          // Only participation certificates - must meet minimum
+          if (attendee.days_attended >= course.min_days_for_participation) {
+            certType = 'participation';
+          }
+        } else if (course.certificate_type === 'both') {
+          // Both types - completion if all days, else participation if minimum met
+          if (attendee.days_attended >= course.num_days) {
+            certType = 'completion';
+          } else if (attendee.days_attended >= course.min_days_for_participation) {
+            certType = 'participation';
+          }
+        }
 
-        await sql`
-          INSERT INTO certificates (
-            enrollment_id, certificate_type, verification_code, 
-            days_attended, total_days
-          ) VALUES (
-            ${attendee.enrollment_id}, ${certType}, ${verificationCode},
-            ${attendee.days_attended}, ${course.num_days}
-          )
-        `;
-        generated++;
+        if (certType) {
+          const verificationCode = generateVerificationCode();
+
+          await sql`
+            INSERT INTO certificates (
+              enrollment_id, certificate_type, verification_code, 
+              days_attended, total_days
+            ) VALUES (
+              ${attendee.enrollment_id}, ${certType}, ${verificationCode},
+              ${attendee.days_attended}, ${course.num_days}
+            )
+          `;
+          generated++;
+        }
       }
 
       return json({ success: true, count: generated });
