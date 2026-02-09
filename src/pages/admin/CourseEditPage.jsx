@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { AdminLayout } from '../../components/layout';
 import { CourseForm, TrainersEditor, DaysEditor } from '../../components/admin';
-import { Card, CardBody, CardHeader, CardTitle, Loading, Alert, Button } from '../../components/ui';
+import { Card, CardBody, Loading, Alert, Button } from '../../components/ui';
 import { getAdminCourse, createCourse, updateCourse, updateCourseTrainers, updateCourseDays } from '../../utils/api';
 
 export function CourseEditPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const isNew = id === 'new';
+  const isNew = !id || id === 'new';
 
   const [course, setCourse] = useState(null);
   const [trainers, setTrainers] = useState([]);
@@ -215,7 +215,7 @@ export function CourseEditPage() {
                   <div key={dayNum} className="p-2 bg-gray-50 rounded">
                     <span className="text-gray-500">Day {dayNum}:</span>{' '}
                     <code className="text-helix-primary">
-                      {window.location.origin}/training/attend/{course.slug}/{dayNum}
+                      {window.location.origin}/attend/{course.slug}/{dayNum}
                     </code>
                   </div>
                 ))}
