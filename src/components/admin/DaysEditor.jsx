@@ -1,117 +1,163 @@
-import React, { useState } from 'react';
-import { Button, Input } from '../ui';
-import QuestionsEditor from './QuestionsEditor';
-import { formatDateForInput } from '../../utils/helpers';
+import React from 'react';
+import { Input, Button } from '../ui';
 
-export function DaysEditor({
-  days = [],
-  onChange,
-  numDays = 1,
-}) {
-  const [expandedDay, setExpandedDay] = useState(null);
-
+export function DaysEditor({ days, onChange, numDays }) {
   // Ensure we have entries for all days
-  const ensureDays = () => {
-    const existingDays = [...days];
-    for (let i = 1; i <= numDays; i++) {
-      if (!existingDays.find(d => d.day_number === i)) {
-        existingDays.push({
-          id: `new_${i}`,
-          day_number: i,
-          title: '',
-          date: null,
-          questions: [],
-        });
-      }
-    }
-    // Remove days that exceed numDays
-    return existingDays
-      .filter(d => d.day_number <= numDays)
-      .sort((a, b) => a.day_number - b.day_number);
-  };
+  const ensuredDays = Array.from({ length: numDays }, (_, i) => {
+    const dayNum = i + 1;
+    const existing = days.find(d => d.day_number === dayNum);
+    return existing || {
+      id: `new_${dayNum}`,
+      day_number: dayNum,
+      title: '',
+      date: '',
+      hours: '',
+      questions: [],
+    };
+  });
 
-  const sortedDays = ensureDays();
-
-  const handleUpdate = (dayNumber, field, value) => {
-    const updated = sortedDays.map(d => {
-      if (d.day_number === dayNumber) {
-        return { ...d, [field]: value };
+  const handleDayChange = (dayNumber, field, value) => {
+    const updated = ensuredDays.map(day => {
+      if (day.day_number === dayNumber) {
+        return { ...day, [field]: value };
       }
-      return d;
+      return day;
     });
     onChange(updated);
   };
 
-  const handleQuestionsChange = (dayNumber, questions) => {
-    handleUpdate(dayNumber, 'questions', questions);
+  const handleQuestionChange = (dayNumber, questionIndex, field, value) => {
+    const updated = ensuredDays.map(day => {
+      if (day.day_number === dayNumber) {
+        const questions = [...(day.questions || [])];
+        questions[questionIndex] = { ...questions[questionIndex], [field]: value };
+        return { ...day, questions };
+      }
+      return day;
+    });
+    onChange(updated);
   };
 
-  const toggleExpand = (dayNumber) => {
-    setExpandedDay(expandedDay === dayNumber ? null : dayNumber);
+  const addQuestion = (dayNumber) => {
+    const updated = ensuredDays.map(day => {
+      if (day.day_number === dayNumber) {
+        const questions = [...(day.questions || [])];
+        questions.push({
+          id: `new_${Date.now()}`,
+          question_text: '',
+          question_type: 'text',
+          required: true,
+          display_order: questions.length,
+        });
+        return { ...day, questions };
+      }
+      return day;
+    });
+    onChange(updated);
+  };
+
+  const removeQuestion = (dayNumber, questionIndex) => {
+    const updated = ensuredDays.map(day => {
+      if (day.day_number === dayNumber) {
+        const questions = [...(day.questions || [])];
+        questions.splice(questionIndex, 1);
+        return { ...day, questions };
+      }
+      return day;
+    });
+    onChange(updated);
   };
 
   return (
-    <div className="space-y-4">
-      <h4 className="font-medium text-gray-900">Course Days & Survey Questions</h4>
-      
-      <div className="space-y-3">
-        {sortedDays.map((day) => (
-          <div
-            key={day.day_number}
-            className="border border-gray-200 rounded-lg overflow-hidden"
-          >
-            {/* Day Header */}
-            <div
-              className="flex items-center justify-between p-4 bg-gray-50 cursor-pointer"
-              onClick={() => toggleExpand(day.day_number)}
-            >
-              <div className="flex items-center gap-4">
-                <span className="font-medium text-helix-primary">
-                  Day {day.day_number}
-                </span>
-                {day.title && (
-                  <span className="text-gray-600">— {day.title}</span>
-                )}
-                {day.questions?.length > 0 && (
-                  <span className="text-sm text-gray-400">
-                    ({day.questions.length} question{day.questions.length !== 1 ? 's' : ''})
-                  </span>
-                )}
-              </div>
-              <span className="text-gray-400">
-                {expandedDay === day.day_number ? '▼' : '▶'}
-              </span>
+    <div className="space-y-8">
+      {ensuredDays.map(day => (
+        <div key={day.day_number} className="border rounded-lg p-4">
+          <h3 className="text-lg font-semibold mb-4">Day {day.day_number}</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <Input
+              label="Title (optional)"
+              value={day.title || ''}
+              onChange={(e) => handleDayChange(day.day_number, 'title', e.target.value)}
+              placeholder="e.g., Introduction & Overview"
+            />
+            <Input
+              label="Date"
+              type="date"
+              value={day.date || ''}
+              onChange={(e) => handleDayChange(day.day_number, 'date', e.target.value)}
+            />
+            <Input
+              label="Hours"
+              type="number"
+              step="0.5"
+              min="0"
+              max="24"
+              value={day.hours || ''}
+              onChange={(e) => handleDayChange(day.day_number, 'hours', e.target.value)}
+              placeholder="e.g., 8"
+            />
+          </div>
+
+          {/* Questions */}
+          <div className="mt-4">
+            <div className="flex justify-between items-center mb-2">
+              <h4 className="font-medium text-gray-700">Survey Questions</h4>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => addQuestion(day.day_number)}
+              >
+                Add Question
+              </Button>
             </div>
 
-            {/* Day Details */}
-            {expandedDay === day.day_number && (
-              <div className="p-4 border-t border-gray-200 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input
-                    label="Day Title (Optional)"
-                    value={day.title || ''}
-                    onChange={(e) => handleUpdate(day.day_number, 'title', e.target.value)}
-                    placeholder={`e.g., Day ${day.day_number}: Foundations`}
-                  />
-                  <Input
-                    label="Date (Optional)"
-                    type="date"
-                    value={formatDateForInput(day.date)}
-                    onChange={(e) => handleUpdate(day.day_number, 'date', e.target.value || null)}
-                  />
-                </div>
-
-                <div className="pt-4 border-t border-gray-100">
-                  <QuestionsEditor
-                    questions={day.questions || []}
-                    onChange={(questions) => handleQuestionsChange(day.day_number, questions)}
-                  />
-                </div>
+            {(day.questions || []).length === 0 ? (
+              <p className="text-sm text-gray-500 italic">No questions for this day</p>
+            ) : (
+              <div className="space-y-3">
+                {(day.questions || []).map((question, qIndex) => (
+                  <div key={question.id || qIndex} className="flex gap-2 items-start bg-gray-50 p-3 rounded">
+                    <div className="flex-1">
+                      <Input
+                        placeholder="Question text"
+                        value={question.question_text || ''}
+                        onChange={(e) => handleQuestionChange(day.day_number, qIndex, 'question_text', e.target.value)}
+                      />
+                    </div>
+                    <select
+                      value={question.question_type || 'text'}
+                      onChange={(e) => handleQuestionChange(day.day_number, qIndex, 'question_type', e.target.value)}
+                      className="border rounded px-2 py-2 text-sm"
+                    >
+                      <option value="text">Text</option>
+                      <option value="rating">Rating (1-5)</option>
+                      <option value="yes_no">Yes/No</option>
+                    </select>
+                    <label className="flex items-center gap-1 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={question.required ?? true}
+                        onChange={(e) => handleQuestionChange(day.day_number, qIndex, 'required', e.target.checked)}
+                      />
+                      Required
+                    </label>
+                    <Button
+                      type="button"
+                      variant="danger"
+                      size="sm"
+                      onClick={() => removeQuestion(day.day_number, qIndex)}
+                    >
+                      ×
+                    </Button>
+                  </div>
+                ))}
               </div>
             )}
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
   );
 }

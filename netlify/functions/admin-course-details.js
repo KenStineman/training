@@ -68,16 +68,17 @@ export async function handler(event, context) {
           await sql`
             UPDATE course_days SET
               title = ${day.title || null},
-              date = ${day.date || null}
+              date = ${day.date || null},
+              hours = ${day.hours || 0}
             WHERE id = ${day.id}
           `;
         } else {
           // Insert or update by day_number
           await sql`
-            INSERT INTO course_days (course_id, day_number, title, date)
-            VALUES (${courseId}, ${day.day_number}, ${day.title || null}, ${day.date || null})
+            INSERT INTO course_days (course_id, day_number, title, date, hours)
+            VALUES (${courseId}, ${day.day_number}, ${day.title || null}, ${day.date || null}, ${day.hours || 0})
             ON CONFLICT (course_id, day_number) 
-            DO UPDATE SET title = ${day.title || null}, date = ${day.date || null}
+            DO UPDATE SET title = ${day.title || null}, date = ${day.date || null}, hours = ${day.hours || 0}
           `;
         }
 

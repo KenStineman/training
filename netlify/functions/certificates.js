@@ -46,6 +46,7 @@ async function fetchCert(sql, code) {
       c.logo_url,
       (SELECT MIN(date) FROM course_days WHERE course_id = c.id AND date IS NOT NULL) as course_start_date,
       (SELECT MAX(date) FROM course_days WHERE course_id = c.id AND date IS NOT NULL) as course_end_date,
+      (SELECT COALESCE(SUM(hours), 0) FROM course_days WHERE course_id = c.id) as total_hours,
       json_agg(DISTINCT jsonb_build_object(
         'name', ct.name,
         'title', ct.title
@@ -92,7 +93,7 @@ async function generateCertificatePDF(cert) {
 
   // WATERMARK - increased size
   if (logo) {
-    const maxWatermarkWidth = 680; // increased from 560
+    const maxWatermarkWidth = 680;
     const scale = maxWatermarkWidth / logo.width;
     const wmWidth = logo.width * scale;
     const wmHeight = logo.height * scale;
@@ -215,10 +216,15 @@ async function generateCertificatePDF(cert) {
     yOffset += 25;
   }
 
-  const days = `Attended ${cert.days_attended} of ${cert.total_days} days`;
+  // Days attended with hours
+  const totalHours = parseFloat(cert.total_hours) || 0;
+  let daysText = `Attended ${cert.days_attended} of ${cert.total_days} days`;
+  if (totalHours > 0) {
+    daysText += ` (${totalHours} hours)`;
+  }
 
-  page.drawText(days, {
-    x: width / 2 - reg.widthOfTextAtSize(days, 14) / 2,
+  page.drawText(daysText, {
+    x: width / 2 - reg.widthOfTextAtSize(daysText, 14) / 2,
     y: height - yOffset,
     size: 14,
     font: reg,

@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS courses (
     requires_all_days_for_completion BOOLEAN DEFAULT true,
     logo_url VARCHAR(500),
     certificate_template VARCHAR(50) DEFAULT 'standard',
+    default_organization VARCHAR(255),
     active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -62,6 +63,7 @@ CREATE TABLE IF NOT EXISTS course_days (
     day_number INTEGER NOT NULL,
     title VARCHAR(255),
     date DATE,
+    hours DECIMAL(4,1) DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(course_id, day_number)
 );
@@ -196,6 +198,14 @@ CREATE TRIGGER update_attendees_updated_at
     EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================================================
+-- MIGRATION: Add columns if upgrading existing database
+-- ============================================================================
+
+-- Run these if you already have the database set up:
+-- ALTER TABLE courses ADD COLUMN IF NOT EXISTS default_organization VARCHAR(255);
+-- ALTER TABLE course_days ADD COLUMN IF NOT EXISTS hours DECIMAL(4,1) DEFAULT 0;
+
+-- ============================================================================
 -- SAMPLE DATA (Optional - uncomment to insert test data)
 -- ============================================================================
 
@@ -222,11 +232,11 @@ BEGIN
     VALUES (course_uuid, 'Kelly Weyrauch', 'Lead Instructor', 1);
     
     -- Insert days
-    INSERT INTO course_days (course_id, day_number, title) VALUES
-        (course_uuid, 1, 'Day 1: Agile Foundations in Regulated Environments'),
-        (course_uuid, 2, 'Day 2: TIR-45 Framework Deep Dive'),
-        (course_uuid, 3, 'Day 3: Implementation Strategies'),
-        (course_uuid, 4, 'Day 4: Compliance and Continuous Improvement');
+    INSERT INTO course_days (course_id, day_number, title, hours) VALUES
+        (course_uuid, 1, 'Day 1: Agile Foundations in Regulated Environments', 8),
+        (course_uuid, 2, 'Day 2: TIR-45 Framework Deep Dive', 8),
+        (course_uuid, 3, 'Day 3: Implementation Strategies', 8),
+        (course_uuid, 4, 'Day 4: Compliance and Continuous Improvement', 8);
 END $$;
 
 -- Insert sample survey questions for Day 1
