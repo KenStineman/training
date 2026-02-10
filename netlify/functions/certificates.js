@@ -46,7 +46,13 @@ async function fetchCert(sql, code) {
       c.logo_url,
       (SELECT MIN(date) FROM course_days WHERE course_id = c.id AND date IS NOT NULL) as course_start_date,
       (SELECT MAX(date) FROM course_days WHERE course_id = c.id AND date IS NOT NULL) as course_end_date,
-      (SELECT COALESCE(SUM(hours), 0) FROM course_days WHERE course_id = c.id) as total_hours,
+      (
+        SELECT COALESCE(SUM(cd.hours), 0) 
+        FROM attendance att2
+        JOIN course_days cd ON att2.course_day_id = cd.id
+        WHERE att2.enrollment_id = cert.enrollment_id
+      ) as hours_attended,
+      (SELECT COALESCE(SUM(hours), 0) FROM course_days WHERE course_id = c.id) as total_course_hours,
       json_agg(DISTINCT jsonb_build_object(
         'name', ct.name,
         'title', ct.title
@@ -91,7 +97,7 @@ async function generateCertificatePDF(cert) {
     }
   }
 
-  // WATERMARK - increased size
+  // WATERMARK
   if (logo) {
     const maxWatermarkWidth = 680;
     const scale = maxWatermarkWidth / logo.width;
@@ -217,10 +223,10 @@ async function generateCertificatePDF(cert) {
   }
 
   // Days attended with hours
-  const totalHours = parseFloat(cert.total_hours) || 0;
+  const hoursAttended = parseFloat(cert.hours_attended) || 0;
   let daysText = `Attended ${cert.days_attended} of ${cert.total_days} days`;
-  if (totalHours > 0) {
-    daysText += ` (${totalHours} hours)`;
+  if (hoursAttended > 0) {
+    daysText += ` (${hoursAttended} hours)`;
   }
 
   page.drawText(daysText, {

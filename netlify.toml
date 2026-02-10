@@ -7,6 +7,7 @@
   node_bundler = "esbuild"
 
 # Public API
+
 [[redirects]]
   from = "/api/courses/:slug/day/:day"
   to = "/.netlify/functions/courses/:slug/day/:day"
@@ -36,6 +37,16 @@
 [[redirects]]
   from = "/api/admin/certificates/send"
   to = "/.netlify/functions/admin-send-certificates"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/courses/:id/report/pdf"
+  to = "/.netlify/functions/admin-course-report/:id/report/pdf"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/courses/:id/report/csv"
+  to = "/.netlify/functions/admin-course-report/:id/report/csv"
   status = 200
 
 [[redirects]]

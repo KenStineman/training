@@ -36,6 +36,12 @@ async function request(endpoint, options = {}) {
     }
     return response.blob();
   }
+  if (contentType && contentType.includes('text/csv')) {
+    if (!response.ok) {
+      throw new Error('Failed to download CSV');
+    }
+    return response.blob();
+  }
   
   const data = await response.json();
   
@@ -209,6 +215,20 @@ export async function getCourseCertificates(courseId) {
   return request(`/admin/courses/${courseId}/certificates`);
 }
 
+/**
+ * Download training report PDF
+ */
+export async function downloadReportPDF(courseId) {
+  return request(`/admin/courses/${courseId}/report/pdf`);
+}
+
+/**
+ * Download training report CSV
+ */
+export async function downloadReportCSV(courseId) {
+  return request(`/admin/courses/${courseId}/report/csv`);
+}
+
 export default {
   getCourse,
   getCourseDay,
@@ -227,4 +247,6 @@ export default {
   generateCertificates,
   sendCertificateEmails,
   getCourseCertificates,
+  downloadReportPDF,
+  downloadReportCSV,
 };

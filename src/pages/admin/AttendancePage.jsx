@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { AdminLayout } from '../../components/layout';
 import { AttendanceTable } from '../../components/admin';
-import { Card, CardBody, Loading, Alert } from '../../components/ui';
-import { getAdminCourse, getAttendanceReport } from '../../utils/api';
-import { percentage } from '../../utils/helpers';
+import { Card, CardBody, Loading, Alert, Button } from '../../components/ui';
+import { getAdminCourse, getAttendanceReport, downloadReportPDF, downloadReportCSV } from '../../utils/api';
+import { percentage, downloadBlob } from '../../utils/helpers';
 
 export function AttendancePage() {
   const { id } = useParams();
@@ -14,6 +14,8 @@ export function AttendancePage() {
   const [attendees, setAttendees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [downloadingPDF, setDownloadingPDF] = useState(false);
+  const [downloadingCSV, setDownloadingCSV] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -35,6 +37,30 @@ export function AttendancePage() {
     fetchData();
   }, [id]);
 
+  const handleDownloadPDF = async () => {
+    try {
+      setDownloadingPDF(true);
+      const blob = await downloadReportPDF(id);
+      downloadBlob(blob, `training-report-${course.slug}.pdf`);
+    } catch (err) {
+      alert('Failed to download PDF report: ' + err.message);
+    } finally {
+      setDownloadingPDF(false);
+    }
+  };
+
+  const handleDownloadCSV = async () => {
+    try {
+      setDownloadingCSV(true);
+      const blob = await downloadReportCSV(id);
+      downloadBlob(blob, `training-report-${course.slug}.csv`);
+    } catch (err) {
+      alert('Failed to download CSV report: ' + err.message);
+    } finally {
+      setDownloadingCSV(false);
+    }
+  };
+
   if (loading) {
     return (
       <AdminLayout>
@@ -51,7 +77,6 @@ export function AttendancePage() {
     );
   }
 
-  // ✅ FIXED: derive attendance from attendance array
   const completedCount = attendees.filter(
     a => (a.attendance?.length || 0) === course.num_days
   ).length;
@@ -67,19 +92,37 @@ export function AttendancePage() {
     <AdminLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <Link
-            to={`/admin/courses/${id}`}
-            className="text-sm text-gray-500 hover:text-gray-700 mb-2 inline-block"
-          >
-            ← Back to {course.name}
-          </Link>
+        <div className="flex justify-between items-start">
+          <div>
+            <Link
+              to={`/admin/courses/${id}`}
+              className="text-sm text-gray-500 hover:text-gray-700 mb-2 inline-block"
+            >
+              ← Back to {course.name}
+            </Link>
 
-          <h1 className="text-2xl font-display font-bold text-gray-900">
-            Attendance Report
-          </h1>
+            <h1 className="text-2xl font-display font-bold text-gray-900">
+              Attendance Report
+            </h1>
 
-          <p className="text-gray-500">{course.name}</p>
+            <p className="text-gray-500">{course.name}</p>
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              onClick={handleDownloadCSV}
+              loading={downloadingCSV}
+            >
+              Download CSV
+            </Button>
+            <Button
+              onClick={handleDownloadPDF}
+              loading={downloadingPDF}
+            >
+              Download PDF Report
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
