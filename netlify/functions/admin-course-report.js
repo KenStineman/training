@@ -82,7 +82,20 @@ async function fetchReportData(sql, courseId) {
     ORDER BY day_number
   `;
 
-  // Get attendees with attendance details
+  // Get all survey questions for this course
+  const questions = await sql`
+    SELECT 
+      sq.id,
+      sq.question_text,
+      sq.question_type,
+      cd.day_number
+    FROM survey_questions sq
+    JOIN course_days cd ON sq.course_day_id = cd.id
+    WHERE cd.course_id = ${courseId}
+    ORDER BY cd.day_number, sq.display_order
+  `;
+
+  // Get attendees with attendance details and survey responses
   const attendees = await sql`
     SELECT 
       a.full_name,
@@ -92,7 +105,8 @@ async function fetchReportData(sql, courseId) {
       (
         SELECT json_agg(json_build_object(
           'day_number', cd.day_number,
-          'checked_in_at', att.checked_in_at
+          'checked_in_at', att.checked_in_at,
+          'attendance_id', att.id
         ) ORDER BY cd.day_number)
         FROM attendance att
         JOIN course_days cd ON att.course_day_id = cd.id
@@ -115,7 +129,16 @@ async function fetchReportData(sql, courseId) {
         )
         FROM certificates cert
         WHERE cert.enrollment_id = e.id
-      ) as certificate
+      ) as certificate,
+      (
+        SELECT json_agg(json_build_object(
+          'question_id', sr.question_id,
+          'response_value', sr.response_value
+        ))
+        FROM survey_responses sr
+        JOIN attendance att ON sr.attendance_id = att.id
+        WHERE att.enrollment_id = e.id
+      ) as survey_responses
     FROM attendees a
     JOIN enrollments e ON a.id = e.attendee_id
     WHERE e.course_id = ${courseId}
@@ -130,6 +153,7 @@ async function fetchReportData(sql, courseId) {
     course,
     trainers,
     days,
+    questions,
     attendees,
     totalHours,
     completedCount,
@@ -358,7 +382,7 @@ async function generateReportPDF(data) {
 }
 
 function generateReportCSV(data) {
-  const { course, trainers, days, attendees, totalHours } = data;
+  const { course, trainers, days, questions, attendees, totalHours } = data;
 
   const lines = [];
 
@@ -372,18 +396,53 @@ function generateReportCSV(data) {
   lines.push(`# Generated: ${new Date().toISOString()}`);
   lines.push('');
 
-  // Column headers
+  // Build column headers
   const dayHeaders = days.map(d => `Day ${d.day_number}`).join(',');
-  lines.push(`Full Name,Email,Organization,Days Attended,Hours Attended,${dayHeaders},Certificate Type,Verification Code,Issued Date`);
+  
+  // Build question headers - prefix with day number for clarity
+  const questionHeaders = questions.map(q => {
+    const truncated = q.question_text.length > 40 
+      ? q.question_text.substring(0, 37) + '...' 
+      : q.question_text;
+    return `"Day ${q.day_number}: ${truncated.replace(/"/g, '""')}"`;
+  }).join(',');
+
+  const headerParts = [
+    'Full Name',
+    'Email',
+    'Organization',
+    'Days Attended',
+    'Hours Attended',
+    dayHeaders,
+    'Certificate Type',
+    'Verification Code',
+    'Issued Date',
+  ];
+  
+  if (questions.length > 0) {
+    headerParts.push(questionHeaders);
+  }
+  
+  lines.push(headerParts.join(','));
 
   // Data rows
   for (const att of attendees) {
+    // Day attendance (Y/N for each day)
     const dayChecks = days.map(d => {
       const attended = att.attendance?.find(a => a.day_number === d.day_number);
       return attended ? 'Y' : 'N';
     }).join(',');
 
-    const row = [
+    // Survey responses
+    const responseValues = questions.map(q => {
+      const response = att.survey_responses?.find(r => r.question_id === q.id);
+      const value = response?.response_value || '';
+      // Escape quotes and wrap in quotes if contains comma or quote
+      const escaped = value.replace(/"/g, '""');
+      return `"${escaped}"`;
+    }).join(',');
+
+    const rowParts = [
       `"${att.full_name}"`,
       att.email,
       `"${att.organization || ''}"`,
@@ -394,7 +453,12 @@ function generateReportCSV(data) {
       att.certificate?.code || '',
       att.certificate?.issued_at ? new Date(att.certificate.issued_at).toISOString().split('T')[0] : '',
     ];
-    lines.push(row.join(','));
+
+    if (questions.length > 0) {
+      rowParts.push(responseValues);
+    }
+
+    lines.push(rowParts.join(','));
   }
 
   return lines.join('\n');
