@@ -186,15 +186,17 @@ async function generateCertificatePDF(cert) {
   // Course dates
   let courseDatesText = '';
   if (cert.course_start_date && cert.course_end_date) {
-    const startDate = new Date(cert.course_start_date).toLocaleDateString('en-US', {
+    const startDate = new Date(cert.course_start_date + 'T12:00:00Z').toLocaleDateString('en-US', {
       month: 'long',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
+      timeZone: 'UTC'
     });
-    const endDate = new Date(cert.course_end_date).toLocaleDateString('en-US', {
+    const endDate = new Date(cert.course_end_date + 'T12:00:00Z').toLocaleDateString('en-US', {
       month: 'long',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
+      timeZone: 'UTC'
     });
     if (startDate === endDate) {
       courseDatesText = startDate;
@@ -202,10 +204,11 @@ async function generateCertificatePDF(cert) {
       courseDatesText = `${startDate} – ${endDate}`;
     }
   } else if (cert.course_start_date) {
-    courseDatesText = new Date(cert.course_start_date).toLocaleDateString('en-US', {
+    courseDatesText = new Date(cert.course_start_date + 'T12:00:00Z').toLocaleDateString('en-US', {
       month: 'long',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
+      timeZone: 'UTC'
     });
   }
 
@@ -242,7 +245,8 @@ async function generateCertificatePDF(cert) {
   const issued = new Date(cert.issued_at).toLocaleDateString('en-US', {
     month: 'long',
     day: 'numeric',
-    year: 'numeric'
+    year: 'numeric',
+    timeZone: 'UTC'
   });
   const dateText = `Issued: ${issued}`;
 
