@@ -1,295 +1,304 @@
 import { getDb } from './_shared/db.js';
-import { verifyAuth } from './_shared/auth.js';
-import { json, notFound, error, options } from './_shared/response.js';
+import { json, notFound, error, pdf, options } from './_shared/response.js';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 export async function handler(event, context) {
-  // Handle CORS preflight
-  if (event.httpMethod === 'OPTIONS') {
-    return options();
-  }
-
-  // Verify auth
-  const auth = await verifyAuth(event);
-  if (!auth.authenticated) {
-    return {
-      statusCode: 401,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: auth.error || 'Unauthorized' }),
-    };
-  }
+  if (event.httpMethod === 'OPTIONS') return options();
 
   const sql = getDb();
-  
-  // Parse path - handle both formats
+
   const path = event.path
-    .replace(/^\/?\.netlify\/functions\/admin-course-details\/?/, '')
-    .replace(/^\/?api\/admin\/courses\/?/, '');
+    .replace(/^\/?\.netlify\/functions\/certificates\/?/, '')
+    .replace(/^\/?api\/certificates\/?/, '');
   const segments = path.split('/').filter(Boolean);
 
   try {
-    if (segments.length < 2) {
-      return notFound('Endpoint not found');
+    if (event.httpMethod === 'GET' && segments.length === 1) {
+      const code = segments[0].toUpperCase();
+      const rows = await fetchCert(sql, code);
+      if (!rows.length) return notFound('Certificate not found');
+      return json(rows[0]);
     }
 
-    const courseId = segments[0];
-    const action = segments[1];
+    if (event.httpMethod === 'GET' && segments[1] === 'pdf') {
+      const code = segments[0].toUpperCase();
+      const rows = await fetchCert(sql, code);
+      if (!rows.length) return notFound('Certificate not found');
 
-    // PUT /:id/trainers - Update trainers
-    if (event.httpMethod === 'PUT' && action === 'trainers') {
-      const { trainers } = JSON.parse(event.body);
-
-      // Delete existing trainers
-      await sql`DELETE FROM course_trainers WHERE course_id = ${courseId}`;
-
-      // Insert new trainers
-      if (trainers && trainers.length > 0) {
-        for (const trainer of trainers) {
-          await sql`
-            INSERT INTO course_trainers (course_id, name, title, display_order)
-            VALUES (${courseId}, ${trainer.name}, ${trainer.title || null}, ${trainer.display_order || 0})
-          `;
-        }
-      }
-
-      const updated = await sql`
-        SELECT * FROM course_trainers WHERE course_id = ${courseId} ORDER BY display_order
-      `;
-
-      return json({ trainers: updated });
-    }
-
-    // PUT /:id/days - Update days
-    if (event.httpMethod === 'PUT' && action === 'days') {
-      const { days } = JSON.parse(event.body);
-
-      for (const day of days) {
-        if (day.id && !day.id.startsWith('new_')) {
-          // Update existing day
-          await sql`
-            UPDATE course_days SET
-              title = ${day.title || null},
-              date = ${day.date || null},
-              hours = ${day.hours || 0}
-            WHERE id = ${day.id}
-          `;
-        } else {
-          // Insert or update by day_number
-          await sql`
-            INSERT INTO course_days (course_id, day_number, title, date, hours)
-            VALUES (${courseId}, ${day.day_number}, ${day.title || null}, ${day.date || null}, ${day.hours || 0})
-            ON CONFLICT (course_id, day_number) 
-            DO UPDATE SET title = ${day.title || null}, date = ${day.date || null}, hours = ${day.hours || 0}
-          `;
-        }
-
-        // Handle questions for this day
-        if (day.questions && Array.isArray(day.questions)) {
-          // Get the day ID
-          const dayRecords = await sql`
-            SELECT id FROM course_days 
-            WHERE course_id = ${courseId} AND day_number = ${day.day_number}
-          `;
-          
-          if (dayRecords.length > 0) {
-            const dayId = dayRecords[0].id;
-
-            // Get existing question IDs
-            const existingQuestions = await sql`
-              SELECT id FROM survey_questions WHERE course_day_id = ${dayId}
-            `;
-            const existingIds = new Set(existingQuestions.map(q => q.id));
-
-            // Process each question
-            const processedIds = new Set();
-            
-            for (const question of day.questions) {
-              if (question.id && !question.id.startsWith('new_')) {
-                // Update existing question
-                await sql`
-                  UPDATE survey_questions SET
-                    question_text = ${question.question_text},
-                    question_type = ${question.question_type || 'text'},
-                    options = ${question.options ? JSON.stringify(question.options) : null},
-                    required = ${question.required ?? true},
-                    display_order = ${question.display_order || 0}
-                  WHERE id = ${question.id}
-                `;
-                processedIds.add(question.id);
-              } else {
-                // Insert new question
-                await sql`
-                  INSERT INTO survey_questions (
-                    course_day_id, question_text, question_type, options, required, display_order
-                  ) VALUES (
-                    ${dayId}, ${question.question_text}, ${question.question_type || 'text'},
-                    ${question.options ? JSON.stringify(question.options) : null},
-                    ${question.required ?? true}, ${question.display_order || 0}
-                  )
-                `;
-              }
-            }
-
-            // Delete questions that weren't in the update
-            for (const existingId of existingIds) {
-              if (!processedIds.has(existingId)) {
-                await sql`DELETE FROM survey_questions WHERE id = ${existingId}`;
-              }
-            }
-          }
-        }
-      }
-
-      // Return updated days with questions
-      const updated = await sql`
-        SELECT cd.*,
-               json_agg(
-                 json_build_object(
-                   'id', sq.id,
-                   'question_text', sq.question_text,
-                   'question_type', sq.question_type,
-                   'options', sq.options,
-                   'required', sq.required,
-                   'display_order', sq.display_order
-                 ) ORDER BY sq.display_order
-               ) FILTER (WHERE sq.id IS NOT NULL) as questions
-        FROM course_days cd
-        LEFT JOIN survey_questions sq ON cd.id = sq.course_day_id
-        WHERE cd.course_id = ${courseId}
-        GROUP BY cd.id
-        ORDER BY cd.day_number
-      `;
-
-      return json({ days: updated });
-    }
-
-    // GET /:id/attendance - Get attendance report
-    if (event.httpMethod === 'GET' && action === 'attendance') {
-      const attendees = await sql`
-        SELECT 
-          a.id,
-          a.email,
-          a.full_name,
-          a.organization,
-          e.id as enrollment_id,
-          e.enrolled_at,
-          COUNT(att.id) as days_attended,
-          json_agg(
-            json_build_object(
-              'day_number', cd.day_number,
-              'checked_in_at', att.checked_in_at
-            ) ORDER BY cd.day_number
-          ) FILTER (WHERE att.id IS NOT NULL) as attendance
-        FROM attendees a
-        JOIN enrollments e ON a.id = e.attendee_id
-        LEFT JOIN attendance att ON e.id = att.enrollment_id
-        LEFT JOIN course_days cd ON att.course_day_id = cd.id
-        WHERE e.course_id = ${courseId}
-        GROUP BY a.id, e.id
-        ORDER BY a.full_name
-      `;
-
-      return json({ attendees });
-    }
-
-    // POST /:id/certificates - Generate certificates
-    if (event.httpMethod === 'POST' && action === 'certificates') {
-      // Get course details
-      const courses = await sql`SELECT * FROM courses WHERE id = ${courseId}`;
-      if (courses.length === 0) {
-        return notFound('Course not found');
-      }
-      const course = courses[0];
-
-      // Get all attendees with their attendance count who don't have certificates yet
-      const attendees = await sql`
-        SELECT 
-          e.id as enrollment_id,
-          a.full_name,
-          a.email,
-          COUNT(att.id)::int as days_attended
-        FROM enrollments e
-        JOIN attendees a ON e.attendee_id = a.id
-        LEFT JOIN attendance att ON e.id = att.enrollment_id
-        LEFT JOIN certificates cert ON e.id = cert.enrollment_id
-        WHERE e.course_id = ${courseId}
-          AND cert.id IS NULL
-        GROUP BY e.id, a.id
-      `;
-
-      let generated = 0;
-      
-      for (const attendee of attendees) {
-        let certType = null;
-        
-        // Determine certificate type based on course settings and attendance
-        if (course.certificate_type === 'completion') {
-          // Only completion certificates - must attend all days
-          if (attendee.days_attended >= course.num_days) {
-            certType = 'completion';
-          }
-        } else if (course.certificate_type === 'participation') {
-          // Only participation certificates - must meet minimum
-          if (attendee.days_attended >= course.min_days_for_participation) {
-            certType = 'participation';
-          }
-        } else if (course.certificate_type === 'both') {
-          // Both types - completion if all days, else participation if minimum met
-          if (attendee.days_attended >= course.num_days) {
-            certType = 'completion';
-          } else if (attendee.days_attended >= course.min_days_for_participation) {
-            certType = 'participation';
-          }
-        }
-
-        if (certType) {
-          const verificationCode = generateVerificationCode();
-          const issuedDate = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
-
-          await sql`
-            INSERT INTO certificates (
-              enrollment_id, certificate_type, verification_code, 
-              days_attended, total_days, issued_at
-            ) VALUES (
-              ${attendee.enrollment_id}, ${certType}, ${verificationCode},
-              ${attendee.days_attended}, ${course.num_days}, ${issuedDate}::date
-            )
-          `;
-          generated++;
-        }
-      }
-
-      return json({ success: true, count: generated });
-    }
-
-    // GET /:id/certificates - List certificates
-    if (event.httpMethod === 'GET' && action === 'certificates') {
-      const certificates = await sql`
-        SELECT 
-          cert.*,
-          a.full_name as attendee_name,
-          a.email as attendee_email
-        FROM certificates cert
-        JOIN enrollments e ON cert.enrollment_id = e.id
-        JOIN attendees a ON e.attendee_id = a.id
-        WHERE e.course_id = ${courseId}
-        ORDER BY cert.issued_at DESC
-      `;
-
-      return json({ certificates });
+      const pdfBytes = await generateCertificatePDF(rows[0]);
+      return pdf(Buffer.from(pdfBytes), `certificate-${code}.pdf`);
     }
 
     return notFound('Endpoint not found');
   } catch (err) {
-    console.error('Error in admin-course-details function:', err);
-    return error('Server error: ' + err.message, 500);
+    console.error(err);
+    return error(err.message, 500);
   }
 }
 
-function generateVerificationCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 12; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+async function fetchCert(sql, code) {
+  return sql`
+    SELECT 
+      cert.*,
+      a.full_name as attendee_name,
+      a.email as attendee_email,
+      c.name as course_name,
+      c.logo_url,
+      (SELECT MIN(date) FROM course_days WHERE course_id = c.id AND date IS NOT NULL) as course_start_date,
+      (SELECT MAX(date) FROM course_days WHERE course_id = c.id AND date IS NOT NULL) as course_end_date,
+      (
+        SELECT COALESCE(SUM(cd.hours), 0) 
+        FROM attendance att2
+        JOIN course_days cd ON att2.course_day_id = cd.id
+        WHERE att2.enrollment_id = cert.enrollment_id
+      ) as hours_attended,
+      (SELECT COALESCE(SUM(hours), 0) FROM course_days WHERE course_id = c.id) as total_course_hours,
+      json_agg(DISTINCT jsonb_build_object(
+        'name', ct.name,
+        'title', ct.title
+      )) FILTER (WHERE ct.id IS NOT NULL) as trainers
+    FROM certificates cert
+    JOIN enrollments e ON cert.enrollment_id = e.id
+    JOIN attendees a ON e.attendee_id = a.id
+    JOIN courses c ON e.course_id = c.id
+    LEFT JOIN course_trainers ct ON c.id = ct.course_id
+    WHERE cert.verification_code = ${code}
+    GROUP BY cert.id, a.id, c.id
+  `;
+}
+
+async function generateCertificatePDF(cert) {
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([792, 612]);
+
+  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const reg = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const italic = await pdfDoc.embedFont(StandardFonts.TimesRomanItalic);
+
+  const { width, height } = page.getSize();
+
+  const primary = rgb(0.118, 0.227, 0.373);
+  const gold = rgb(0.831, 0.686, 0.216);
+  const gray = rgb(0.45, 0.45, 0.45);
+
+  const LOGO_URL = process.env.LOGO_URL || cert.logo_url;
+  let logo;
+
+  if (LOGO_URL) {
+    try {
+      const img = await fetch(LOGO_URL).then(r => r.arrayBuffer());
+      if (LOGO_URL.toLowerCase().endsWith('.jpg') || LOGO_URL.toLowerCase().endsWith('.jpeg')) {
+        logo = await pdfDoc.embedJpg(img);
+      } else {
+        logo = await pdfDoc.embedPng(img);
+      }
+    } catch (err) {
+      console.error('Failed to load certificate logo:', LOGO_URL, err);
+    }
   }
-  return code;
+
+  // WATERMARK
+  if (logo) {
+    const maxWatermarkWidth = 680;
+    const scale = maxWatermarkWidth / logo.width;
+    const wmWidth = logo.width * scale;
+    const wmHeight = logo.height * scale;
+    const watermarkY = height / 2 - wmHeight / 2 - 100;
+
+    page.drawImage(logo, {
+      x: width / 2 - wmWidth / 2,
+      y: watermarkY,
+      width: wmWidth,
+      height: wmHeight,
+      opacity: 0.06
+    });
+  }
+
+  // Top logo
+  if (logo) {
+    const s = 0.25;
+    page.drawImage(logo, {
+      x: width / 2 - (logo.width * s) / 2,
+      y: height - 90,
+      width: logo.width * s,
+      height: logo.height * s
+    });
+  }
+
+  // Borders
+  page.drawRectangle({ x: 30, y: 30, width: width - 60, height: height - 60, borderWidth: 3, borderColor: gold });
+  page.drawRectangle({ x: 40, y: 40, width: width - 80, height: height - 80, borderWidth: 1, borderColor: primary });
+
+  const isCompletion = cert.certificate_type === 'completion';
+  const title = isCompletion ? 'Certificate of Completion' : 'Certificate of Participation';
+
+  page.drawText(title, {
+    x: width / 2 - bold.widthOfTextAtSize(title, 32) / 2,
+    y: height - 150,
+    size: 32,
+    font: bold,
+    color: primary
+  });
+
+  page.drawLine({
+    start: { x: width / 2 - 150, y: height - 170 },
+    end: { x: width / 2 + 150, y: height - 170 },
+    thickness: 2,
+    color: gold
+  });
+
+  page.drawText('This certifies that', {
+    x: width / 2 - italic.widthOfTextAtSize('This certifies that', 16) / 2,
+    y: height - 205,
+    size: 16,
+    font: italic,
+    color: gray
+  });
+
+  page.drawText(cert.attendee_name, {
+    x: width / 2 - bold.widthOfTextAtSize(cert.attendee_name, 36) / 2,
+    y: height - 250,
+    size: 36,
+    font: bold,
+    color: primary
+  });
+
+  const action = isCompletion ? 'has successfully completed' : 'has participated in';
+
+  page.drawText(action, {
+    x: width / 2 - italic.widthOfTextAtSize(action, 16) / 2,
+    y: height - 285,
+    size: 16,
+    font: italic,
+    color: gray
+  });
+
+  const cs = cert.course_name.length > 40 ? 20 : 24;
+
+  page.drawText(cert.course_name, {
+    x: width / 2 - bold.widthOfTextAtSize(cert.course_name, cs) / 2,
+    y: height - 320,
+    size: cs,
+    font: bold,
+    color: primary
+  });
+
+  // Course dates
+  let courseDatesText = '';
+  if (cert.course_start_date && cert.course_end_date) {
+    const startDate = new Date(cert.course_start_date + 'T12:00:00Z').toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'UTC'
+    });
+    const endDate = new Date(cert.course_end_date + 'T12:00:00Z').toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'UTC'
+    });
+    if (startDate === endDate) {
+      courseDatesText = startDate;
+    } else {
+      courseDatesText = `${startDate} – ${endDate}`;
+    }
+  } else if (cert.course_start_date) {
+    courseDatesText = new Date(cert.course_start_date + 'T12:00:00Z').toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'UTC'
+    });
+  }
+
+  let yOffset = 355;
+
+  if (courseDatesText) {
+    page.drawText(courseDatesText, {
+      x: width / 2 - reg.widthOfTextAtSize(courseDatesText, 14) / 2,
+      y: height - yOffset,
+      size: 14,
+      font: reg,
+      color: gray
+    });
+    yOffset += 25;
+  }
+
+  // Days attended with hours
+  const hoursAttended = parseFloat(cert.hours_attended) || 0;
+  let daysText = `Attended ${cert.days_attended} of ${cert.total_days} days`;
+  if (hoursAttended > 0) {
+    daysText += ` (${hoursAttended} hours)`;
+  }
+
+  page.drawText(daysText, {
+    x: width / 2 - reg.widthOfTextAtSize(daysText, 14) / 2,
+    y: height - yOffset,
+    size: 14,
+    font: reg,
+    color: gray
+  });
+
+  yOffset += 25;
+
+  const issuedRaw = cert.issued_at instanceof Date
+    ? cert.issued_at.toISOString().split('T')[0]
+    : String(cert.issued_at).split('T')[0];
+  const issued = new Date(issuedRaw + 'T12:00:00Z').toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC'
+  });
+  const dateText = `Issued: ${issued}`;
+
+  page.drawText(dateText, {
+    x: width / 2 - reg.widthOfTextAtSize(dateText, 12) / 2,
+    y: height - yOffset,
+    size: 12,
+    font: reg,
+    color: gray
+  });
+
+  const footerBaseY = 110;
+
+  // Instructor centered
+  if (cert.trainers?.length) {
+    const t = cert.trainers.map(x => x.name).filter(Boolean).join(', ');
+    if (t) {
+      const instructorText = `Instructor: ${t}`;
+      page.drawText(instructorText, {
+        x: width / 2 - bold.widthOfTextAtSize(instructorText, 12) / 2,
+        y: footerBaseY + 30,
+        size: 12,
+        font: bold,
+        color: primary
+      });
+    }
+  }
+
+  // Company centered
+  const companyText = 'Double Helix LLC';
+
+  page.drawText(companyText, {
+    x: width / 2 - bold.widthOfTextAtSize(companyText, 12) / 2,
+    y: footerBaseY,
+    size: 12,
+    font: bold,
+    color: primary
+  });
+
+  // Verification centered
+  const verify = `Verification Code: ${cert.verification_code}`;
+
+  page.drawText(verify, {
+    x: width / 2 - reg.widthOfTextAtSize(verify, 10) / 2,
+    y: footerBaseY - 20,
+    size: 10,
+    font: reg,
+    color: gray
+  });
+
+  return pdfDoc.save();
 }
