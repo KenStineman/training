@@ -99,7 +99,7 @@ async function generateCertificatePDF(cert) {
 
   // WATERMARK
   if (logo) {
-    const maxWatermarkWidth = 680;
+    const maxWatermarkWidth = 720;
     const scale = maxWatermarkWidth / logo.width;
     const wmWidth = logo.width * scale;
     const wmHeight = logo.height * scale;
@@ -242,14 +242,15 @@ async function generateCertificatePDF(cert) {
 
   yOffset += 25;
 
-  const issuedRaw = cert.issued_at instanceof Date
-    ? cert.issued_at.toISOString().split('T')[0]
-    : String(cert.issued_at).split('T')[0];
-  const issued = new Date(issuedRaw + 'T12:00:00Z').toLocaleDateString('en-US', {
+  // Convert UTC timestamp to Pacific time for display
+  const issuedDate = cert.issued_at instanceof Date 
+    ? cert.issued_at 
+    : new Date(cert.issued_at);
+  const issued = issuedDate.toLocaleDateString('en-US', {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
-    timeZone: 'UTC'
+    timeZone: 'America/Los_Angeles'
   });
   const dateText = `Issued: ${issued}`;
 
