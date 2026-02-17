@@ -242,7 +242,10 @@ async function generateCertificatePDF(cert) {
 
   yOffset += 25;
 
-  const issued = new Date(cert.issued_at).toLocaleDateString('en-US', {
+  const issuedRaw = cert.issued_at instanceof Date
+    ? cert.issued_at.toISOString().split('T')[0]
+    : String(cert.issued_at).split('T')[0];
+  const issued = new Date(issuedRaw + 'T12:00:00Z').toLocaleDateString('en-US', {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
